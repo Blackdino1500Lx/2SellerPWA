@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Spinner from '../ui/Spinner'
 
 export default function CustomerFormSheet({
   open,
-  customer,        // null = crear, objeto = editar
+  customer,
   onClose,
   onSaved,
   onDeleted
 }) {
+  const { profile } = useAuth()
   const [form, setForm] = useState(emptyForm())
   const [sellers, setSellers] = useState([])
   const [loadingSellers, setLoadingSellers] = useState(false)
@@ -64,7 +66,7 @@ export default function CustomerFormSheet({
   }
 
   async function handleSave(e) {
-    e.preventDefault()
+    e?.preventDefault?.()
     setError('')
 
     if (!form.nombre.trim()) {
@@ -97,13 +99,16 @@ export default function CustomerFormSheet({
           .eq('id', customer.id)
         if (error) throw error
       } else {
+        if (!profile?.company_id) {
+          throw new Error('No se pudo determinar la empresa del usuario')
+        }
         const { error } = await supabase
           .from('customers')
-          .insert(payload)
+          .insert({ ...payload, company_id: profile.company_id })
         if (error) throw error
       }
 
-      onSaved?.()
+      await onSaved?.()
       onClose?.()
     } catch (err) {
       console.error('Error guardando cliente:', err)
@@ -124,7 +129,7 @@ export default function CustomerFormSheet({
         .eq('id', customer.id)
       if (error) throw error
 
-      onDeleted?.()
+      await onDeleted?.()
       onClose?.()
     } catch (err) {
       console.error('Error desactivando cliente:', err)
@@ -198,7 +203,6 @@ export default function CustomerFormSheet({
               placeholder="cliente@correo.com"
             />
 
-            {/* Selector de vendedor */}
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-1.5">
                 Vendedor asignado *
@@ -250,7 +254,6 @@ export default function CustomerFormSheet({
               </div>
             )}
 
-            {/* Soft delete */}
             {isEdit && (
               <div className="border-t border-slate-200 pt-4 mt-2">
                 {!confirmDelete ? (

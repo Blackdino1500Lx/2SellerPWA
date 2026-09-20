@@ -7,7 +7,6 @@ import {
   Tooltip,
   CartesianGrid
 } from 'recharts'
-import { fmtFechaCorta } from '../../lib/format'
 
 export default function SalesChart({ data }) {
   if (!data || data.length === 0) {
@@ -19,7 +18,7 @@ export default function SalesChart({ data }) {
   }
 
   const chartData = data.map((d) => ({
-    mes: fmtFechaCorta(d.mes),
+    label: d.label,
     ventas: Number(d.ventas),
     pedidos: d.pedidos
   }))
@@ -30,7 +29,7 @@ export default function SalesChart({ data }) {
         <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
           <XAxis
-            dataKey="mes"
+            dataKey="label"
             tick={{ fontSize: 11, fill: '#64748b' }}
             axisLine={false}
             tickLine={false}
@@ -39,7 +38,7 @@ export default function SalesChart({ data }) {
             tick={{ fontSize: 11, fill: '#64748b' }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+            tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
             width={40}
           />
           <Tooltip

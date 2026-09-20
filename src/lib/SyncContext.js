@@ -1,14 +1,16 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useOnline } from '../hooks/useOnline'
+import { useToast } from './ToastContext'
 import { syncAll, getCacheStatus } from '../lib/sync'
-import { clearLocalData } from '../lib/db'
+import { clearLocalData, cleanupOldPDFs, cleanupOldDrafts } from '../lib/db'
 
 const SyncContext = createContext(null)
 
 export function SyncProvider({ children }) {
   const { isAuthenticated } = useAuth()
   const online = useOnline()
+  const { showToast } = useToast()
 
   const [syncing, setSyncing] = useState(false)
   const [lastSync, setLastSync] = useState(null)
@@ -16,7 +18,9 @@ export function SyncProvider({ children }) {
     hasData: false,
     customerCount: 0,
     productCount: 0,
-    lastOrderCount: 0
+    lastOrderCount: 0,
+    pendingCount: 0,
+    draftErrors: 0
   })
   const [error, setError] = useState('')
   const [initialSyncDone, setInitialSyncDone] = useState(false)
@@ -41,9 +45,41 @@ export function SyncProvider({ children }) {
 
       setSyncing(true)
       setError('')
+
       try {
-        await syncAll()
+        const result = await syncAll()
         await refreshStatus()
+
+        // Notificar resultado de drafts si hubo algo
+        const d = result?.drafts
+        if (d && d.total > 0) {
+          if (d.failed === 0) {
+            showToast({
+              type: 'success',
+              message: d.total === 1
+                ? 'Pedido sincronizado'
+                : `${d.total} pedidos sincronizados`
+            })
+          } else if (d.ok === 0) {
+            showToast({
+              type: 'error',
+              message: d.total === 1
+                ? 'No se pudo sincronizar 1 pedido'
+                : `No se pudieron sincronizar ${d.total} pedidos`,
+              duration: 6000
+            })
+          } else {
+            showToast({
+              type: 'warning',
+              message: `${d.ok} sincronizados, ${d.failed} con error`,
+              duration: 6000
+            })
+          }
+        }
+
+        // Limpieza silenciosa de cachés viejos
+        cleanupOldPDFs(7).catch(() => {})
+        cleanupOldDrafts(30).catch(() => {})
       } catch (err) {
         console.error('Sync error:', err)
         setError(err.message || 'Error sincronizando')
@@ -53,7 +89,7 @@ export function SyncProvider({ children }) {
         if (isInitial) setInitialSyncDone(true)
       }
     },
-    [online, syncing, refreshStatus]
+    [online, syncing, refreshStatus, showToast]
   )
 
   // Sync inicial al autenticarse
@@ -69,7 +105,7 @@ export function SyncProvider({ children }) {
     }
   }, [isAuthenticated, online, runSync, refreshStatus])
 
-  // Al recuperar conexión: re-sync (solo si ya se hizo el inicial)
+  // Al recuperar conexión: re-sync
   useEffect(() => {
     if (isAuthenticated && online && initialSyncStarted.current && initialSyncDone) {
       runSync(false)
@@ -80,7 +116,14 @@ export function SyncProvider({ children }) {
   useEffect(() => {
     if (wasAuthenticated.current && !isAuthenticated) {
       clearLocalData().then(() => {
-        setStatus({ hasData: false, customerCount: 0, productCount: 0, lastOrderCount: 0 })
+        setStatus({
+          hasData: false,
+          customerCount: 0,
+          productCount: 0,
+          lastOrderCount: 0,
+          pendingCount: 0,
+          draftErrors: 0
+        })
         setLastSync(null)
         setInitialSyncDone(false)
         initialSyncStarted.current = false

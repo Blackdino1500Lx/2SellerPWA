@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { localDb } from '../lib/localDb'
 import { useAuth } from '../hooks/useAuth'
+import { useOnline } from '../hooks/useOnline'
+import { useCustomer } from '../hooks/useCustomers'
+import { useProducts } from '../hooks/useProducts'
+import { useLastOrder } from '../hooks/useLastOrder'
 import { useSync } from '../context/SyncContext'
 import AppShell from '../components/layout/AppShell'
 import Header from '../components/layout/Header'
@@ -15,145 +18,58 @@ import Button from '../components/ui/Button'
 import { useOrderEditor } from '../hooks/useOrderEditor'
 import { fmtFecha } from '../lib/format'
 import { uuid } from '../lib/uuid'
-import { generarPDFPedido } from '../lib/pdf'
+import { generarPDFPedido, pdfBlob } from '../lib/pdf'
+import { makeLocalFolio } from '../lib/device'
+import { saveDraft } from '../lib/drafts'
+import { getMeta } from '../lib/sync'
 
 export default function OrderEditorPage() {
   const { id: customerId } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { online, refreshPending } = useSync()
+  const online = useOnline()
+  const { refreshStatus } = useSync()
 
-  const [customer, setCustomer] = useState(null)
-  const [products, setProducts] = useState([])
+  const customer = useCustomer(customerId)
+  const products = useProducts()
+  const lastOrder = useLastOrder(customerId)
+
   const [seller, setSeller] = useState(null)
   const [company, setCompany] = useState(null)
-  const [lastOrder, setLastOrder] = useState(null)
-  const [initialItems, setInitialItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [metaLoaded, setMetaLoaded] = useState(false)
   const [notas, setNotas] = useState('')
+  const [notasInitialized, setNotasInitialized] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState('')
 
   const [clientUuid] = useState(() => uuid())
 
+  // Cargar seller y company desde el caché (meta)
   useEffect(() => {
     let mounted = true
-
-    async function load() {
-      setLoading(true)
-      setError('')
-
-      let cachedCustomer = null
-      let cachedProducts = []
-      let cachedLast = null
-      let cachedSeller = null
-      let cachedCompany = null
-
-      try {
-        cachedCustomer = localDb.getCustomer(customerId)
-        cachedProducts = localDb.getProducts() || []
-        cachedLast = localDb.getLastOrderFor(customerId)
-        cachedSeller = localDb.getSeller()
-        cachedCompany = localDb.getCompany()
-      } catch (e) {
-        console.warn('localDb read falló:', e)
-      }
-
-      if (cachedCustomer) {
-        setCustomer(cachedCustomer)
-        if (cachedLast) {
-          setLastOrder(cachedLast)
-          setInitialItems(cachedLast.items || [])
-          setNotas(cachedLast.notas ?? '')
-        }
-        if (cachedProducts.length > 0) setProducts(cachedProducts)
-        if (cachedSeller) setSeller(cachedSeller)
-        if (cachedCompany) setCompany(cachedCompany)
-        setLoading(false)
-      }
-
-      if (!navigator.onLine) {
-        if (!cachedCustomer) {
-          setError('Sin conexión y sin datos locales de este cliente')
-        }
-        setLoading(false)
-        return
-      }
-
-      try {
-        const [custRes, prodRes, lastRes, sellerRes, companyRes] = await Promise.all([
-          supabase.from('customers').select('*').eq('id', customerId).maybeSingle(),
-          supabase
-            .from('products')
-            .select('id, sku, nombre, precio, impuesto_pct')
-            .eq('activo', true)
-            .order('nombre'),
-          supabase
-            .from('orders')
-            .select(`
-              id, folio, folio_local, fecha, notas,
-              order_items (
-                product_id, producto_nombre, producto_sku,
-                precio_unitario, impuesto_pct,
-                cantidad, descuento_pct
-              )
-            `)
-            .eq('customer_id', customerId)
-            .eq('anulado', false)
-            .order('fecha', { ascending: false })
-            .maybeSingle(),
-          supabase
-            .from('sellers')
-            .select('id, codigo, zona, users (nombre, email)')
-            .maybeSingle(),
-          supabase.from('companies').select('*').maybeSingle()
-        ])
-
-        if (!mounted) return
-
-        if (custRes.error || !custRes.data) {
-          if (!cachedCustomer) {
-            setError('Cliente no encontrado')
-            setLoading(false)
-            return
-          }
-        } else {
-          setCustomer(custRes.data)
-        }
-
-        if (prodRes.data && prodRes.data.length > 0) setProducts(prodRes.data)
-        if (sellerRes.data) setSeller(sellerRes.data)
-        if (companyRes.data) setCompany(companyRes.data)
-
-        if (lastRes.data) {
-          const remoteLast = {
-            order_id: lastRes.data.id,
-            folio: lastRes.data.folio || lastRes.data.folio_local,
-            fecha: lastRes.data.fecha,
-            notas: lastRes.data.notas,
-            items: lastRes.data.order_items || []
-          }
-          setLastOrder(remoteLast)
-          setInitialItems(remoteLast.items)
-          setNotas(remoteLast.notas ?? '')
-        } else if (!cachedLast) {
-          setLastOrder(null)
-          setInitialItems([])
-        }
-      } catch (err) {
-        console.warn('Refresh desde red falló, usando cache:', err)
-        if (!cachedCustomer) setError('Error al cargar cliente')
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    }
-
-    load()
+    ;(async () => {
+      const [cachedSeller, cachedCompany] = await Promise.all([
+        getMeta('seller'),
+        getMeta('company')
+      ])
+      if (!mounted) return
+      setSeller(cachedSeller)
+      setCompany(cachedCompany)
+      setMetaLoaded(true)
+    })()
     return () => { mounted = false }
-  }, [customerId])
+  }, [])
 
+  // Precargar notas del último pedido
+  useEffect(() => {
+    if (lastOrder && !notasInitialized) {
+      setNotas(lastOrder.notas ?? '')
+      setNotasInitialized(true)
+    }
+  }, [lastOrder, notasInitialized])
+
+  const initialItems = useMemo(() => lastOrder?.items ?? [], [lastOrder])
   const editor = useOrderEditor(initialItems)
 
   const historicalItems = useMemo(
@@ -165,49 +81,25 @@ export default function OrderEditorPage() {
     [editor.items]
   )
 
-  function construirSnapshotsPDF(folioFinal, fechaFinal) {
-    const empresaPDF = company || localDb.getCompany() || {
-      nombre: 'Distribuidora',
-      identificacion: '',
-      direccion: ''
-    }
-    const vendedorPDF = {
-      nombre: seller?.users?.nombre || profile?.nombre || 'Vendedor',
-      codigo: seller?.codigo || '',
-      zona: seller?.zona || ''
-    }
-    const clientePDF = {
-      nombre: customer.nombre,
-      identificacion: customer.identificacion,
-      direccion: customer.direccion
-    }
-    const pedidoPDF = {
-      folio: folioFinal,
-      fecha: fechaFinal,
+  // Construye el "order" tal como lo guardaría el servidor (para el PDF offline)
+  function buildLocalOrder(folioLocal) {
+    return {
+      folio_local: folioLocal,
+      fecha: new Date().toISOString(),
       notas: notas || null,
       subtotal: editor.totals.subtotal,
       impuestos: editor.totals.impuestos,
       total: editor.totals.total,
-      items: editor.items.map((i) => ({
-        producto_sku: i.producto_sku,
-        producto_nombre: i.producto_nombre,
-        precio_unitario: i.precio_unitario,
-        impuesto_pct: i.impuesto_pct,
-        cantidad: i.cantidad,
-        descuento_pct: i.descuento_pct
-      }))
-    }
-    return { pedidoPDF, empresaPDF, clientePDF, vendedorPDF }
-  }
-
-  async function confirmarOffline() {
-    const createdAt = new Date().toISOString()
-    const folioLocal = `LOCAL-${Date.now().toString(36).toUpperCase()}`
-
-    const draft = {
-      client_uuid: clientUuid,
-      customer_id: customerId,
-      customer_nombre: customer.nombre,
+      cliente_nombre: customer?.nombre ?? '',
+      cliente_identificacion: customer?.identificacion ?? '',
+      cliente_direccion: customer?.direccion ?? '',
+      seller_nombre: seller?.nombre ?? profile?.nombre ?? 'Vendedor',
+      seller_codigo: seller?.codigo ?? '',
+      seller_zona: seller?.zona ?? '',
+      company_id: company?.id ?? null,
+      company_nombre: company?.nombre ?? 'Distribuidora',
+      company_identificacion: company?.identificacion ?? '',
+      company_direccion: company?.direccion ?? '',
       items: editor.items.map((i) => ({
         product_id: i.product_id,
         producto_nombre: i.producto_nombre,
@@ -215,81 +107,48 @@ export default function OrderEditorPage() {
         precio_unitario: i.precio_unitario,
         impuesto_pct: i.impuesto_pct,
         cantidad: i.cantidad,
-        descuento_pct: i.descuento_pct
-      })),
-      notas: notas || null,
-      folio_local: folioLocal,
-      created_at: createdAt,
-      subtotal: editor.totals.subtotal,
-      impuestos: editor.totals.impuestos,
-      total: editor.totals.total,
-      synced: false
+        descuento_pct: i.descuento_pct || 0
+      }))
     }
-
-    try {
-      localDb.addDraft(draft)
-    } catch (e) {
-      console.error('No se pudo guardar draft:', e)
-      setConfirmError('No se pudo guardar el pedido offline')
-      return
-    }
-
-    // Actualizar lastOrder local para que el próximo pedido ya lo vea
-    try {
-      localDb.setLastOrderFor(customerId, {
-        order_id: null,
-        folio: folioLocal,
-        fecha: createdAt,
-        notas: notas || null,
-        items: draft.items
-      })
-    } catch (e) {
-      console.warn('No se pudo actualizar lastOrders:', e)
-    }
-
-    refreshPending()
-
-    // Generar PDF con datos locales
-    let pdfBytes = null
-    try {
-      const { pedidoPDF, empresaPDF, clientePDF, vendedorPDF } =
-        construirSnapshotsPDF(folioLocal, createdAt)
-      pdfBytes = await generarPDFPedido({
-        pedido: pedidoPDF,
-        empresa: empresaPDF,
-        cliente: clientePDF,
-        vendedor: vendedorPDF
-      })
-    } catch (pdfErr) {
-      console.error('Error generando PDF offline:', pdfErr)
-    }
-
-    navigate('/pedido/confirmado', {
-      replace: true,
-      state: {
-        result: {
-          folio: folioLocal,
-          subtotal: editor.totals.subtotal,
-          impuestos: editor.totals.impuestos,
-          total: editor.totals.total,
-          duplicate: false,
-          offline: true
-        },
-        pdfBytes,
-        customerNombre: customer.nombre,
-        fecha: createdAt
-      }
-    })
   }
 
-  async function confirmarOnline() {
+  function buildPDFInputs(order) {
+    return {
+      pedido: {
+        folio: order.folio_local,
+        fecha: order.fecha,
+        notas: order.notas,
+        subtotal: order.subtotal,
+        impuestos: order.impuestos,
+        total: order.total,
+        items: order.items
+      },
+      empresa: {
+        nombre: order.company_nombre,
+        identificacion: order.company_identificacion,
+        direccion: order.company_direccion
+      },
+      cliente: {
+        nombre: order.cliente_nombre,
+        identificacion: order.cliente_identificacion,
+        direccion: order.cliente_direccion
+      },
+      vendedor: {
+        nombre: order.seller_nombre,
+        codigo: order.seller_codigo,
+        zona: order.seller_zona
+      }
+    }
+  }
+
+  async function handleConfirmOnline() {
     const itemsPayload = editor.items.map((i) => ({
       product_id: i.product_id,
       cantidad: i.cantidad,
       descuento_pct: i.descuento_pct || 0
     }))
 
-    const folioLocal = `LOCAL-${Date.now().toString(36).toUpperCase()}`
+    const folioLocal = makeLocalFolio()
 
     const { data: rpcResult, error: rpcErr } = await supabase.rpc('confirm_order', {
       p_customer_id: customerId,
@@ -336,13 +195,13 @@ export default function OrderEditorPage() {
     }
 
     const clientePDF = {
-      nombre: savedOrder.cliente_nombre || customer.nombre,
-      identificacion: savedOrder.cliente_identificacion || customer.identificacion,
-      direccion: savedOrder.cliente_direccion || customer.direccion
+      nombre: savedOrder.cliente_nombre || customer?.nombre,
+      identificacion: savedOrder.cliente_identificacion || customer?.identificacion,
+      direccion: savedOrder.cliente_direccion || customer?.direccion
     }
 
     const vendedorPDF = {
-      nombre: seller?.users?.nombre || profile?.nombre || 'Vendedor',
+      nombre: seller?.nombre || profile?.nombre || 'Vendedor',
       codigo: seller?.codigo || '',
       zona: seller?.zona || ''
     }
@@ -388,18 +247,6 @@ export default function OrderEditorPage() {
       console.error('Error generando PDF:', pdfErr)
     }
 
-    try {
-      localDb.setLastOrderFor(customerId, {
-        order_id: savedOrder.id,
-        folio: savedOrder.folio || savedOrder.folio_local,
-        fecha: savedOrder.fecha,
-        notas: savedOrder.notas,
-        items: pedidoPDF.items
-      })
-    } catch (e) {
-      console.warn('No se pudo actualizar cache lastOrders:', e)
-    }
-
     navigate('/pedido/confirmado', {
       replace: true,
       state: {
@@ -409,12 +256,57 @@ export default function OrderEditorPage() {
           subtotal: Number(savedOrder.subtotal),
           impuestos: Number(savedOrder.impuestos),
           total: Number(savedOrder.total),
-          duplicate: rpcResult.duplicate || false,
-          offline: false
+          duplicate: rpcResult.duplicate || false
         },
         pdfBytes,
-        customerNombre: customer.nombre,
-        fecha: savedOrder.fecha
+        customerNombre: customer?.nombre,
+        fecha: savedOrder.fecha,
+        offline: false
+      }
+    })
+  }
+
+  async function handleConfirmOffline() {
+    const folioLocal = makeLocalFolio()
+    const order = buildLocalOrder(folioLocal)
+    const pdfInputs = buildPDFInputs(order)
+
+    let pdfBytes = null
+    try {
+      pdfBytes = await generarPDFPedido(pdfInputs)
+    } catch (pdfErr) {
+      console.error('Error generando PDF offline:', pdfErr)
+      throw new Error('No se pudo generar el PDF del pedido')
+    }
+
+    const blob = pdfBlob(pdfBytes)
+
+    await saveDraft({
+      clientUuid,
+      customerId,
+      order,
+      pdfBlob: blob
+    })
+
+    // Refrescar el estado del sync para que el badge refleje el pendiente
+    await refreshStatus()
+
+    navigate('/pedido/confirmado', {
+      replace: true,
+      state: {
+        result: {
+          order_id: clientUuid,
+          folio: folioLocal,
+          subtotal: order.subtotal,
+          impuestos: order.impuestos,
+          total: order.total,
+          duplicate: false,
+          pending: true
+        },
+        pdfBytes,
+        customerNombre: customer?.nombre,
+        fecha: order.fecha,
+        offline: true
       }
     })
   }
@@ -425,10 +317,10 @@ export default function OrderEditorPage() {
     setConfirming(true)
 
     try {
-      if (!online) {
-        await confirmarOffline()
+      if (online) {
+        await handleConfirmOnline()
       } else {
-        await confirmarOnline()
+        await handleConfirmOffline()
       }
     } catch (err) {
       console.error('Error confirmando pedido:', err)
@@ -437,6 +329,12 @@ export default function OrderEditorPage() {
       setConfirming(false)
     }
   }
+
+  const loading =
+    customer === undefined ||
+    products === undefined ||
+    lastOrder === undefined ||
+    !metaLoaded
 
   if (loading) {
     return (
@@ -449,13 +347,13 @@ export default function OrderEditorPage() {
     )
   }
 
-  if (error || !customer) {
+  if (!customer) {
     return (
       <AppShell>
         <Header title="Pedido" showBack />
         <EmptyState
-          title="No se pudo cargar"
-          description={error || 'Cliente no disponible'}
+          title="Cliente no disponible"
+          description="No se encontró en la caché local."
           action={<Button onClick={() => navigate('/')}>Volver a clientes</Button>}
         />
       </AppShell>
@@ -465,17 +363,6 @@ export default function OrderEditorPage() {
   return (
     <AppShell>
       <Header title={customer.nombre} subtitle="Nuevo pedido" showBack />
-
-      {!online && (
-        <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
-          </svg>
-          <p className="text-xs text-amber-800">
-            Trabajando offline · El pedido se guardará localmente
-          </p>
-        </div>
-      )}
 
       {lastOrder ? (
         <div className="px-5 py-3 bg-brand-50 border-b border-brand-100 flex items-center gap-2.5">
@@ -495,6 +382,17 @@ export default function OrderEditorPage() {
           </svg>
           <p className="text-xs text-slate-600">
             Cliente sin pedidos previos. Añade productos para comenzar.
+          </p>
+        </div>
+      )}
+
+      {!online && (
+        <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
+          </svg>
+          <p className="text-xs text-amber-800">
+            Trabajando sin conexión. El pedido se guardará localmente.
           </p>
         </div>
       )}

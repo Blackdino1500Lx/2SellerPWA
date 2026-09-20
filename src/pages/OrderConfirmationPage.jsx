@@ -18,19 +18,16 @@ export default function OrderConfirmationPage() {
 
   if (!state?.result) return null
 
-  const { result, pdfBytes, customerNombre, fecha } = state
-  const isOffline = !!result.offline
+  const { result, pdfBytes, customerNombre, fecha, offline } = state
 
   async function handleShare() {
     if (!pdfBytes) return
     setSharing(true)
     try {
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
-      const file = new File(
-        [blob],
-        `pedido-${result.folio}.pdf`,
-        { type: 'application/pdf' }
-      )
+      const file = new File([blob], `pedido-${result.folio}.pdf`, {
+        type: 'application/pdf'
+      })
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -51,6 +48,11 @@ export default function OrderConfirmationPage() {
     }
   }
 
+  async function handleDownload() {
+    if (!pdfBytes) return
+    await descargarPDF(pdfBytes, `pedido-${result.folio}.pdf`)
+  }
+
   const fechaStr = fecha
     ? new Date(fecha).toLocaleString('es-CR', {
         day: '2-digit', month: 'short', year: 'numeric',
@@ -61,13 +63,14 @@ export default function OrderConfirmationPage() {
         hour: '2-digit', minute: '2-digit'
       })
 
+  const isPending = offline || result.pending
+
   return (
     <AppShell>
       <div className="flex-1 flex flex-col items-center justify-center px-8">
-        {/* Icono según estado */}
-        {isOffline ? (
+        {isPending ? (
           <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center mb-5">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.5" strokeLinecap="round">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
             </svg>
@@ -81,22 +84,18 @@ export default function OrderConfirmationPage() {
         )}
 
         <h2 className="text-xl font-bold mb-1">
-          {isOffline ? 'Pedido guardado' : 'Pedido confirmado'}
+          {isPending ? 'Pedido guardado offline' : 'Pedido confirmado'}
         </h2>
         <p className="text-sm text-slate-500 mb-1">{customerNombre}</p>
         <p className="text-xs text-slate-400">{fechaStr}</p>
 
-        {/* Chip según estado */}
-        {isOffline && (
+        {isPending && (
           <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs px-4 py-2.5 rounded-xl text-center max-w-xs">
-            <b>Pendiente de sincronizar</b>
-            <p className="mt-0.5 text-[11px]">
-              Se subirá automáticamente cuando recuperes conexión
-            </p>
+            Se sincronizará automáticamente cuando vuelvas a tener conexión
           </div>
         )}
 
-        {!isOffline && result.duplicate && (
+        {result.duplicate && (
           <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs px-4 py-2.5 rounded-xl">
             Este pedido ya estaba registrado (envío duplicado detectado)
           </div>
@@ -104,9 +103,7 @@ export default function OrderConfirmationPage() {
 
         <div className="w-full bg-slate-50 rounded-2xl p-5 mt-7 space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">
-              {isOffline ? 'Folio local' : 'Folio'}
-            </span>
+            <span className="text-slate-500">Folio</span>
             <span className="font-bold">{result.folio}</span>
           </div>
           {result.subtotal != null && (
@@ -132,19 +129,6 @@ export default function OrderConfirmationPage() {
           <Button
             size="lg"
             className="w-full"
-            onClick={() => abrirPDF(pdfBytes)}
-            disabled={!pdfBytes}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-              <path d="M14 2v6h6" />
-            </svg>
-            Ver PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
             onClick={handleShare}
             disabled={!pdfBytes || sharing}
           >
@@ -154,8 +138,27 @@ export default function OrderConfirmationPage() {
               <circle cx="18" cy="19" r="3" />
               <path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49" />
             </svg>
-            {sharing ? 'Compartiendo…' : 'Compartir'}
+            {sharing ? 'Compartiendo…' : 'Compartir pedido'}
           </Button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => abrirPDF(pdfBytes)}
+              disabled={!pdfBytes}
+            >
+              Ver PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={handleDownload}
+              disabled={!pdfBytes}
+            >
+              Descargar
+            </Button>
+          </div>
         </div>
       </div>
 
