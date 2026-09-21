@@ -7,17 +7,10 @@ export default function OrderItemRow({
   onChangeStock,
   onRemove
 }) {
-  const tieneReferencia =
-    item.originalStock != null || item.originalQty > 0
-
-  const referenciaStock =
-    item.originalStock == null ? '—' : Number(item.originalStock)
-  const referenciaQty = item.originalQty ?? 0
-
   return (
     <div className="py-4 md:py-5 border-b border-slate-100">
-      {/* Fila 1: nombre + referencia */}
-      <div className="flex items-start justify-between gap-4">
+      {/* Fila 1: nombre */}
+      <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="font-semibold text-sm md:text-base leading-tight">
@@ -43,13 +36,6 @@ export default function OrderItemRow({
             )}
           </p>
         </div>
-
-        {tieneReferencia && !item.isNew && (
-          <p className="text-[10px] md:text-xs text-slate-400 text-right leading-tight flex-shrink-0">
-            Antes<br />
-            stock {referenciaStock} · pedido {referenciaQty}
-          </p>
-        )}
       </div>
 
       {/* Fila 2: En tienda hoy + Pedir */}

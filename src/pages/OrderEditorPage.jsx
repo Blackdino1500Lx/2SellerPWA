@@ -404,11 +404,8 @@ export default function OrderEditorPage() {
         {historicalItems.length > 0 && (
           <div className="px-4 md:px-8 pt-4 md:pt-6 pb-2">
             <div className="flex items-center justify-between mb-3 px-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-3 px-1">
                 Del último pedido
-              </p>
-              <p className="text-[10px] text-slate-400">
-                Stock + pedido
               </p>
             </div>
             {historicalItems.map((item) => (
