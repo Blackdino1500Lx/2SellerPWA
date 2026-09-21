@@ -6,6 +6,14 @@ export function fmtCRC(value) {
   })
 }
 
+export function fmtCRCShort(value) {
+  const num = Number(value ?? 0)
+  return '₡' + num.toLocaleString('es-CR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  })
+}
+
 export function fmtFecha(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('es-CR', {

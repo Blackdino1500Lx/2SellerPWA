@@ -45,7 +45,6 @@ export default function OrderEditorPage() {
 
   const [clientUuid] = useState(() => uuid())
 
-  // Cargar seller y company desde el caché (meta)
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -61,7 +60,6 @@ export default function OrderEditorPage() {
     return () => { mounted = false }
   }, [])
 
-  // Precargar notas del último pedido
   useEffect(() => {
     if (lastOrder && !notasInitialized) {
       setNotas(lastOrder.notas ?? '')
@@ -69,7 +67,11 @@ export default function OrderEditorPage() {
     }
   }, [lastOrder, notasInitialized])
 
-  const initialItems = useMemo(() => lastOrder?.items ?? [], [lastOrder])
+  const initialItems = useMemo(
+    () => (lastOrder === undefined ? undefined : (lastOrder?.items ?? [])),
+    [lastOrder]
+  )
+
   const editor = useOrderEditor(initialItems)
 
   const historicalItems = useMemo(
@@ -81,7 +83,6 @@ export default function OrderEditorPage() {
     [editor.items]
   )
 
-  // Construye el "order" tal como lo guardaría el servidor (para el PDF offline)
   function buildLocalOrder(folioLocal) {
     return {
       folio_local: folioLocal,
@@ -107,7 +108,8 @@ export default function OrderEditorPage() {
         precio_unitario: i.precio_unitario,
         impuesto_pct: i.impuesto_pct,
         cantidad: i.cantidad,
-        descuento_pct: i.descuento_pct || 0
+        descuento_pct: i.descuento_pct || 0,
+        stock_tienda: i.stock_tienda
       }))
     }
   }
@@ -145,7 +147,8 @@ export default function OrderEditorPage() {
     const itemsPayload = editor.items.map((i) => ({
       product_id: i.product_id,
       cantidad: i.cantidad,
-      descuento_pct: i.descuento_pct || 0
+      descuento_pct: i.descuento_pct || 0,
+      stock_tienda: i.stock_tienda
     }))
 
     const folioLocal = makeLocalFolio()
@@ -169,7 +172,7 @@ export default function OrderEditorPage() {
         order_items (
           producto_sku, producto_nombre,
           precio_unitario, impuesto_pct,
-          cantidad, descuento_pct
+          cantidad, descuento_pct, stock_tienda
         )
       `)
       .eq('id', rpcResult.order_id)
@@ -190,7 +193,8 @@ export default function OrderEditorPage() {
         precio_unitario: Number(i.precio_unitario),
         impuesto_pct: Number(i.impuesto_pct),
         cantidad: Number(i.cantidad),
-        descuento_pct: Number(i.descuento_pct)
+        descuento_pct: Number(i.descuento_pct),
+        stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda)
       }))
     }
 
@@ -288,7 +292,6 @@ export default function OrderEditorPage() {
       pdfBlob: blob
     })
 
-    // Refrescar el estado del sync para que el badge refleje el pendiente
     await refreshStatus()
 
     navigate('/pedido/confirmado', {
@@ -365,7 +368,7 @@ export default function OrderEditorPage() {
       <Header title={customer.nombre} subtitle="Nuevo pedido" showBack />
 
       {lastOrder ? (
-        <div className="px-5 py-3 bg-brand-50 border-b border-brand-100 flex items-center gap-2.5">
+        <div className="px-5 md:px-8 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round">
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3 2" />
@@ -399,15 +402,21 @@ export default function OrderEditorPage() {
 
       <div className="flex-1 overflow-y-auto pb-4">
         {historicalItems.length > 0 && (
-          <div className="px-4 pt-4 pb-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 px-1">
-              Del último pedido
-            </p>
+          <div className="px-4 md:px-8 pt-4 md:pt-6 pb-2">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Del último pedido
+              </p>
+              <p className="text-[10px] text-slate-400">
+                Stock + pedido
+              </p>
+            </div>
             {historicalItems.map((item) => (
               <OrderItemRow
                 key={item.product_id}
                 item={item}
                 onChangeQty={editor.changeQty}
+                onChangeStock={editor.changeStock}
                 onRemove={editor.removeItem}
               />
             ))}
@@ -415,25 +424,26 @@ export default function OrderEditorPage() {
         )}
 
         {newItems.length > 0 && (
-          <div className="px-4 pt-4 pb-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 px-1">
-              Añadidos
-            </p>
+          <div className="px-4 md:px-8 pt-4 md:pt-6 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-3 px-1">
+  Añadidos
+</p>
             {newItems.map((item) => (
               <OrderItemRow
                 key={item.product_id}
                 item={item}
                 onChangeQty={editor.changeQty}
+                onChangeStock={editor.changeStock}
                 onRemove={editor.removeItem}
               />
             ))}
           </div>
         )}
 
-        <div className="px-4 pt-4">
+        <div className="px-4 md:px-8 pt-4 md:pt-6">
           <button
             onClick={() => setPickerOpen(true)}
-            className="w-full border-2 border-dashed border-slate-300 rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 active:bg-slate-50"
+            className="w-full border-2 border-dashed border-slate-300 rounded-xl py-3 md:py-4 flex items-center justify-center gap-2 text-sm md:text-base font-semibold text-slate-600 active:bg-slate-50"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
@@ -442,7 +452,7 @@ export default function OrderEditorPage() {
           </button>
         </div>
 
-        <div className="px-4 pt-4">
+        <div className="px-4 md:px-8 pt-4 md:pt-6">
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2 px-1">
             Notas (opcional)
           </label>

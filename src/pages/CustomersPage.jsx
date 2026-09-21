@@ -133,19 +133,19 @@ export default function CustomersPage() {
         )}
       </div>
 
-      {isAdmin && (
-        <button
-          onClick={handleNew}
-          disabled={!online}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-xl shadow-brand-600/30 active:scale-95 active:bg-brand-700 transition disabled:opacity-50 z-20"
-          aria-label="Nuevo cliente"
-          title={online ? 'Nuevo cliente' : 'Sin conexión'}
-        >
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
-      )}
+     {isAdmin && (
+  <button
+    onClick={handleNew}
+    disabled={!online}
+    className="fixed bottom-6 right-6 md:right-[max(1.5rem,calc((100vw-48rem)/2+1.5rem))] w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-xl shadow-brand-600/30 active:scale-95 active:bg-brand-700 transition disabled:opacity-50 z-20"
+    aria-label="Nuevo cliente"
+    title={online ? 'Nuevo cliente' : 'Sin conexión'}
+  >
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  </button>
+)}
 
       <CustomerFormSheet
         open={formOpen}

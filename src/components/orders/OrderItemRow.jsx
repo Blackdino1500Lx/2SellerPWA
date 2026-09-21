@@ -1,39 +1,85 @@
 import Stepper from '../ui/Stepper'
+import { fmtCRCShort } from '../../lib/format'
 
-export default function OrderItemRow({ item, onChangeQty, onRemove }) {
+export default function OrderItemRow({
+  item,
+  onChangeQty,
+  onChangeStock,
+  onRemove
+}) {
+  const tieneReferencia =
+    item.originalStock != null || item.originalQty > 0
+
+  const referenciaStock =
+    item.originalStock == null ? '—' : Number(item.originalStock)
+  const referenciaQty = item.originalQty ?? 0
+
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-100">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="font-semibold text-sm leading-tight truncate">
-            {item.producto_nombre}
+    <div className="py-4 md:py-5 border-b border-slate-100">
+      {/* Fila 1: nombre + referencia */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-semibold text-sm md:text-base leading-tight">
+              {item.producto_nombre}
+            </p>
+            {item.isNew && (
+              <span className="text-[9px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">
+                NUEVO
+              </span>
+            )}
+            {item.isModified && !item.isNew && (
+              <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                MODIFICADO
+              </span>
+            )}
+          </div>
+          <p className="text-xs md:text-sm text-slate-500 mt-1">
+            {fmtCRCShort(item.precio_unitario)} c/u
+            {item.descuento_pct > 0 && (
+              <span className="ml-2 text-emerald-600 font-semibold">
+                −{item.descuento_pct}%
+              </span>
+            )}
           </p>
-          {item.isNew && (
-            <span className="text-[9px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">
-              NUEVO
-            </span>
-          )}
-          {item.isModified && !item.isNew && (
-            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-              MODIFICADO
-            </span>
-          )}
         </div>
-        <p className="text-xs text-slate-500">
-          ₡{Number(item.precio_unitario).toLocaleString('es-CR')} c/u
-          {item.descuento_pct > 0 && (
-            <span className="ml-2 text-emerald-600 font-semibold">
-              −{item.descuento_pct}%
-            </span>
-          )}
-        </p>
+
+        {tieneReferencia && !item.isNew && (
+          <p className="text-[10px] md:text-xs text-slate-400 text-right leading-tight flex-shrink-0">
+            Antes<br />
+            stock {referenciaStock} · pedido {referenciaQty}
+          </p>
+        )}
       </div>
 
-      <Stepper
-        value={item.cantidad}
-        onChange={(n) => onChangeQty(item.product_id, n)}
-        onRemove={() => onRemove(item.product_id)}
-      />
+      {/* Fila 2: En tienda hoy + Pedir */}
+      <div className="flex items-end gap-3 md:gap-6 mt-4">
+        <div className="flex-1 max-w-[200px]">
+          <label className="text-[11px] md:text-xs text-slate-500 block mb-1.5">
+            En tienda hoy
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={item.stock_tienda ?? ''}
+            onChange={(e) => onChangeStock(item.product_id, e.target.value)}
+            placeholder="0"
+            className="w-full border border-slate-300 rounded-xl px-3 py-2.5 md:py-3 text-center text-sm md:text-base font-semibold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
+
+        <div className="flex-1 max-w-[200px]">
+          <span className="text-[11px] md:text-xs text-slate-500 block mb-1.5 text-center">
+            Pedir
+          </span>
+          <Stepper
+            value={item.cantidad}
+            onChange={(n) => onChangeQty(item.product_id, n)}
+            onRemove={() => onRemove(item.product_id)}
+          />
+        </div>
+      </div>
     </div>
   )
 }

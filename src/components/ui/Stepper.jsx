@@ -24,12 +24,12 @@ export default function Stepper({ value, onChange, min = 0, step = 1, onRemove }
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center justify-between gap-1">
       <button
         type="button"
         onClick={dec}
         disabled={!canDecrease && !onRemove}
-        className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-xl font-medium active:scale-95 active:bg-slate-200 transition disabled:opacity-40"
+        className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-xl font-medium active:scale-95 active:bg-slate-200 transition disabled:opacity-40 flex-shrink-0"
         aria-label="Disminuir"
       >
         −
@@ -40,14 +40,14 @@ export default function Stepper({ value, onChange, min = 0, step = 1, onRemove }
         inputMode="numeric"
         value={value}
         onChange={handleInput}
-        className="w-10 text-center font-bold text-base bg-transparent outline-none tabular-nums"
-        aria-label="Cantidad"
+        className="flex-1 min-w-0 text-center font-bold text-base bg-transparent outline-none tabular-nums"
+        aria-label="Cantidad a pedir"
       />
 
       <button
         type="button"
         onClick={inc}
-        className="w-10 h-10 rounded-full bg-brand-600 text-white flex items-center justify-center text-xl font-medium active:scale-95 active:bg-brand-700 transition shadow-md shadow-brand-600/25"
+        className="w-10 h-10 rounded-full bg-brand-600 text-white flex items-center justify-center text-xl font-medium active:scale-95 active:bg-brand-700 transition shadow-md shadow-brand-600/25 flex-shrink-0"
         aria-label="Aumentar"
       >
         +

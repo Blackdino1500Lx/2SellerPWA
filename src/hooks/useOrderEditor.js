@@ -27,24 +27,23 @@ function normalizeItem(i) {
     impuesto_pct: Number(i.impuesto_pct) || 0,
     cantidad: Number(i.cantidad) || 1,
     descuento_pct: Number(i.descuento_pct) || 0,
+    stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda),
     originalQty: Number(i.cantidad) || 1,
+    originalStock: i.stock_tienda == null ? null : Number(i.stock_tienda),
     isNew: false,
     isModified: false
   }
 }
 
-export function useOrderEditor(initialItems = []) {
-  const [items, setItems] = useState(() => initialItems.map(normalizeItem))
-  const initializedRef = useRef(initialItems.length > 0)
+export function useOrderEditor(initialItems) {
+  const [items, setItems] = useState([])
+  const hasInitialized = useRef(false)
 
-  // Si initialItems llega después (async load), hidratar una sola vez.
-  // Después de eso, el usuario manda y no se sobreescribe.
   useEffect(() => {
-    if (initializedRef.current) return
-    if (initialItems.length === 0) return
-
-    setItems(initialItems.map(normalizeItem))
-    initializedRef.current = true
+    if (hasInitialized.current) return
+    if (initialItems === undefined) return
+    setItems((initialItems || []).map(normalizeItem))
+    hasInitialized.current = true
   }, [initialItems])
 
   const addItem = useCallback((product) => {
@@ -53,11 +52,7 @@ export function useOrderEditor(initialItems = []) {
       if (exists) {
         return prev.map((i) =>
           i.product_id === product.id
-            ? {
-                ...i,
-                cantidad: i.cantidad + 1,
-                isModified: i.isNew ? i.isModified : true
-              }
+            ? { ...i, cantidad: i.cantidad + 1, isModified: i.isNew ? i.isModified : true }
             : i
         )
       }
@@ -71,7 +66,9 @@ export function useOrderEditor(initialItems = []) {
           impuesto_pct: Number(product.impuesto_pct) || 0,
           cantidad: 1,
           descuento_pct: 0,
+          stock_tienda: null,
           originalQty: 0,
+          originalStock: null,
           isNew: true,
           isModified: false
         }
@@ -90,6 +87,17 @@ export function useOrderEditor(initialItems = []) {
             }
           : i
       )
+    )
+  }, [])
+
+  const changeStock = useCallback((productId, raw) => {
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.product_id !== productId) return i
+        const cleaned = String(raw ?? '').replace(/[^0-9.]/g, '')
+        const val = cleaned === '' ? null : Number(cleaned)
+        return { ...i, stock_tienda: val }
+      })
     )
   }, [])
 
@@ -132,6 +140,7 @@ export function useOrderEditor(initialItems = []) {
     totals,
     addItem,
     changeQty,
+    changeStock,
     removeItem,
     setDiscount
   }

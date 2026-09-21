@@ -3,7 +3,7 @@ import Button from '../ui/Button'
 
 export default function OrderTotals({ totals, onConfirm, disabled = false }) {
   return (
-    <div className="border-t border-slate-200 bg-white px-5 pt-3 pb-5 safe-bottom">
+    <div className="border-t border-slate-200 bg-white px-5 md:px-8 pt-3 md:pt-4 pb-5 safe-bottom">
       <div className="flex items-center justify-between mb-2 text-sm">
         <span className="text-slate-500">Subtotal</span>
         <span className="font-semibold tabular-nums">{fmtCRC(totals.subtotal)}</span>
