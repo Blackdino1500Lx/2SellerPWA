@@ -10,6 +10,7 @@ import OrdersListPage from './pages/OrdersListPage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import CompanySettingsPage from './pages/CompanySettingsPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
+import ProductsListPage from './pages/ProductsListPage'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -101,16 +102,15 @@ export const router = createBrowserRouter([
     )
   },
   {
-  path: '/test-mio',
-  element: (
-    <ProtectedRoute>
-      <div style={{ padding: 40, fontSize: 24 }}>
-        <h1>TEST OK</h1>
-        <p>Si ves esto, el router recarga bien.</p>
-      </div>
-    </ProtectedRoute>
-  )
-},
+    path: '/admin/productos',
+    element: (
+      <ProtectedRoute>
+        <AdminRoute>
+          <ProductsListPage />
+        </AdminRoute>
+      </ProtectedRoute>
+    )
+  },
   {
     path: '/admin/empresa',
     element: (

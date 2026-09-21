@@ -73,6 +73,14 @@ export default function CustomersPage() {
               </svg>
             </IconButton>
             {isAdmin && (
+              <IconButton onClick={() => navigate('/admin/productos')} label="Productos">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+                  <path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" />
+                </svg>
+              </IconButton>
+            )}
+            {isAdmin && (
               <IconButton onClick={() => navigate('/admin/dashboard')} label="Métricas">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 3v18h18M7 14l4-4 4 4 5-5" />
@@ -133,19 +141,19 @@ export default function CustomersPage() {
         )}
       </div>
 
-     {isAdmin && (
-  <button
-    onClick={handleNew}
-    disabled={!online}
-    className="fixed bottom-6 right-6 md:right-[max(1.5rem,calc((100vw-48rem)/2+1.5rem))] w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-xl shadow-brand-600/30 active:scale-95 active:bg-brand-700 transition disabled:opacity-50 z-20"
-    aria-label="Nuevo cliente"
-    title={online ? 'Nuevo cliente' : 'Sin conexión'}
-  >
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  </button>
-)}
+      {isAdmin && (
+        <button
+          onClick={handleNew}
+          disabled={!online}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-xl shadow-brand-600/30 active:scale-95 active:bg-brand-700 transition disabled:opacity-50 z-20"
+          aria-label="Nuevo cliente"
+          title={online ? 'Nuevo cliente' : 'Sin conexión'}
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      )}
 
       <CustomerFormSheet
         open={formOpen}
