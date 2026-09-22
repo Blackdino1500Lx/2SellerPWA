@@ -19,6 +19,18 @@ function round2(n) {
 }
 
 function normalizeItem(i) {
+  // El "stock anterior" es con lo que quedó la tienda la última visita:
+  // stock_tienda + cantidad del pedido previo (ya viene calculado como stock_resultante).
+  // Fallback: si no hay stock_resultante, se usa la cantidad pedida (para pedidos viejos).
+  const stockAnterior =
+    i.stock_resultante != null
+      ? Number(i.stock_resultante)
+      : Number(i.cantidad) || 0
+
+  // Si la DB ya guardó el stock_resultante del pedido anterior, úsalo como
+  // stock actual sugerido. Si no, empieza vacío.
+  const stockSugerido = i.stock_resultante != null ? Number(i.stock_resultante) : null
+
   return {
     product_id: i.product_id,
     producto_nombre: i.producto_nombre,
@@ -27,8 +39,10 @@ function normalizeItem(i) {
     impuesto_pct: Number(i.impuesto_pct) || 0,
     cantidad: 0,
     descuento_pct: 0,
-    stock_tienda: null,
-    originalQty: Number(i.cantidad) || 0,
+    stock_tienda: stockSugerido,
+    stockSuggested: stockSugerido != null,
+    // Referencia: con cuánto quedó en tienda la última visita
+    stockAnterior,
     isNew: false
   }
 }
@@ -48,7 +62,6 @@ export function useOrderEditor(initialItems) {
     setItems((prev) => {
       const exists = prev.find((i) => i.product_id === product.id)
       if (exists) {
-        // Ya está en la lista: sumarle 1 al pedido nuevo
         return prev.map((i) =>
           i.product_id === product.id
             ? { ...i, cantidad: (i.cantidad || 0) + 1 }
@@ -66,7 +79,8 @@ export function useOrderEditor(initialItems) {
           cantidad: 1,
           descuento_pct: 0,
           stock_tienda: null,
-          originalQty: 0,
+          stockSuggested: false,
+          stockAnterior: 0,
           isNew: true
         }
       ]
@@ -90,7 +104,11 @@ export function useOrderEditor(initialItems) {
         if (i.product_id !== productId) return i
         const cleaned = String(raw ?? '').replace(/[^0-9]/g, '')
         const val = cleaned === '' ? null : parseInt(cleaned, 10)
-        return { ...i, stock_tienda: isNaN(val) ? null : val }
+        return {
+          ...i,
+          stock_tienda: isNaN(val) ? null : val,
+          stockSuggested: false
+        }
       })
     )
   }, [])
@@ -130,7 +148,6 @@ export function useOrderEditor(initialItems) {
     }
   }, [items])
 
-  // Solo items con cantidad > 0 se envían al backend
   const itemsToOrder = useMemo(
     () => items.filter((i) => i.cantidad > 0),
     [items]

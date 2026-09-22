@@ -8,7 +8,7 @@ import Header from '../components/layout/Header'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
-import { fmtCRC, fmtFechaHora } from '../lib/format'
+import { fmtCRC, fmtCRCShort, fmtFechaHora } from '../lib/format'
 import { obtenerPDFPedido } from '../lib/orderPDF'
 import { abrirPDF, descargarPDF } from '../lib/pdf'
 
@@ -72,7 +72,8 @@ export default function OrderDetailPage() {
               order_items (
                 producto_sku, producto_nombre,
                 precio_unitario, impuesto_pct,
-                cantidad, descuento_pct
+                cantidad, descuento_pct,
+                stock_tienda, stock_resultante
               )
             `)
             .eq('id', realId)
@@ -99,7 +100,9 @@ export default function OrderDetailPage() {
               precio_unitario: Number(i.precio_unitario),
               impuesto_pct: Number(i.impuesto_pct),
               cantidad: Number(i.cantidad),
-              descuento_pct: Number(i.descuento_pct)
+              descuento_pct: Number(i.descuento_pct),
+              stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda),
+              stock_resultante: i.stock_resultante == null ? null : Number(i.stock_resultante)
             })),
             pending: false,
             hasError: false
@@ -226,12 +229,10 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Info general */}
       <div className="px-5 pt-5 pb-4">
         <p className="text-xs text-slate-500">{fmtFechaHora(order.fecha)}</p>
       </div>
 
-      {/* Cliente */}
       <div className="px-5 pb-4">
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
           Cliente
@@ -247,7 +248,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Vendedor (solo si viene en el draft) */}
       {order.seller_nombre && (
         <div className="px-5 pb-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
@@ -264,46 +264,68 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Items */}
       <div className="px-5 pb-4">
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
           Productos ({order.items.length})
         </p>
         <div className="border border-slate-200 rounded-xl overflow-hidden">
-          {order.items.map((item, idx) => (
-            <div
-              key={`${item.producto_sku}-${idx}`}
-              className={`px-4 py-3 flex items-start gap-3 ${
-                idx < order.items.length - 1 ? 'border-b border-slate-100' : ''
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm leading-tight">
-                  {item.producto_nombre}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {item.producto_sku} · {fmtCRC(item.precio_unitario)} c/u
-                  {item.descuento_pct > 0 && (
-                    <span className="ml-1 text-emerald-600 font-semibold">
-                      −{item.descuento_pct}%
-                    </span>
-                  )}
-                </p>
+          {order.items.map((item, idx) => {
+            const stockNum = item.stock_tienda == null ? null : Number(item.stock_tienda)
+            const cantNum = Number(item.cantidad) || 0
+            const stockResultante =
+              item.stock_resultante != null
+                ? Number(item.stock_resultante)
+                : (stockNum != null ? stockNum + cantNum : null)
+
+            return (
+              <div
+                key={`${item.producto_sku}-${idx}`}
+                className={`px-4 py-3 ${
+                  idx < order.items.length - 1 ? 'border-b border-slate-100' : ''
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm leading-tight">
+                      {item.producto_nombre}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {item.producto_sku} · {fmtCRCShort(item.precio_unitario)} c/u
+                      {item.descuento_pct > 0 && (
+                        <span className="ml-1 text-emerald-600 font-semibold">
+                          −{item.descuento_pct}%
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-sm tabular-nums">×{item.cantidad}</p>
+                    <p className="text-xs text-slate-500 tabular-nums">
+                      {fmtCRCShort(item.precio_unitario * item.cantidad * (1 - (item.descuento_pct || 0) / 100))}
+                    </p>
+                  </div>
+                </div>
+
+                {(stockNum != null || stockResultante != null) && (
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-500">
+                    {stockNum != null && (
+                      <span>
+                        Stock al visitar: <b className="text-slate-700">{stockNum}</b>
+                      </span>
+                    )}
+                    {stockResultante != null && (
+                      <span>
+                        Quedó con: <b className="text-brand-700">{stockResultante}</b>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="font-bold text-sm tabular-nums">
-                  ×{item.cantidad}
-                </p>
-                <p className="text-xs text-slate-500 tabular-nums">
-                  {fmtCRC(item.precio_unitario * item.cantidad * (1 - (item.descuento_pct || 0) / 100))}
-                </p>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
-      {/* Notas */}
       {order.notas && (
         <div className="px-5 pb-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
@@ -315,7 +337,6 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Totales */}
       <div className="px-5 pb-5">
         <div className="bg-slate-50 rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between text-sm">
@@ -334,7 +355,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Acciones */}
       <div className="px-5 pb-8 space-y-2">
         <Button size="lg" className="w-full" onClick={handleCompartir} disabled={pdfBusy}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">

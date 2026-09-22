@@ -1,11 +1,20 @@
 import { db } from './db'
 
 export async function saveDraft({ clientUuid, customerId, order, pdfBlob }) {
+  // Calcular stock_resultante por item (para que el draft local sea consistente)
+  const itemsConResultante = (order.items || []).map((i) => ({
+    ...i,
+    stock_resultante:
+      i.stock_tienda == null ? null : Number(i.stock_tienda) + Number(i.cantidad || 0)
+  }))
+
+  const orderCompleto = { ...order, items: itemsConResultante }
+
   await db.transaction('rw', db.drafts, db.pdfs, db.last_orders, async () => {
     await db.drafts.put({
       client_uuid: clientUuid,
       customer_id: customerId,
-      order,
+      order: orderCompleto,
       synced: 0,
       created_at: new Date().toISOString(),
       synced_at: null,
@@ -21,8 +30,6 @@ export async function saveDraft({ clientUuid, customerId, order, pdfBlob }) {
       })
     }
 
-    // Actualizar last_orders local para que el próximo pedido de este cliente
-    // ya tenga este como referencia
     await db.last_orders.put({
       customer_id: customerId,
       order_id: clientUuid,
@@ -30,7 +37,7 @@ export async function saveDraft({ clientUuid, customerId, order, pdfBlob }) {
       folio_local: order.folio_local,
       fecha: order.fecha,
       notas: order.notas ?? null,
-      items: order.items,
+      items: itemsConResultante,
       updated_at: new Date().toISOString(),
       is_local_draft: true
     })
