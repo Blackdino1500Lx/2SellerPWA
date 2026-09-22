@@ -1,68 +1,108 @@
-import Stepper from '../ui/Stepper'
 import { fmtCRCShort } from '../../lib/format'
 
 export default function OrderItemRow({
   item,
   onChangeQty,
-  onChangeStock,
-  onRemove
+  onChangeStock
 }) {
-  return (
-    <div className="py-4 md:py-5 border-b border-slate-100">
-      {/* Fila 1: nombre */}
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="font-semibold text-sm md:text-base leading-tight">
-              {item.producto_nombre}
-            </p>
-            {item.isNew && (
+  // Variante 1: producto nuevo (añadido del catálogo)
+  if (item.isNew) {
+    return (
+      <div className="py-4 md:py-5 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="font-semibold text-sm md:text-base leading-tight">
+                {item.producto_nombre}
+              </p>
               <span className="text-[9px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">
                 NUEVO
               </span>
-            )}
-            {item.isModified && !item.isNew && (
-              <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                MODIFICADO
-              </span>
-            )}
+            </div>
+            <p className="text-xs md:text-sm text-slate-500 mt-1">
+              {fmtCRCShort(item.precio_unitario)} c/u
+            </p>
           </div>
-          <p className="text-xs md:text-sm text-slate-500 mt-1">
-            {fmtCRCShort(item.precio_unitario)} c/u
-            {item.descuento_pct > 0 && (
-              <span className="ml-2 text-emerald-600 font-semibold">
-                −{item.descuento_pct}%
-              </span>
-            )}
-          </p>
         </div>
-      </div>
 
-      {/* Fila 2: En tienda hoy + Pedir */}
-      <div className="flex items-end gap-3 md:gap-6 mt-4">
-        <div className="flex-1 max-w-[200px]">
-          <label className="text-[11px] md:text-xs text-slate-500 block mb-1.5">
-            En tienda hoy
+        <div>
+          <label className="text-[10px] md:text-xs text-slate-500 block mb-1.5">
+            Cantidad a pedir
           </label>
           <input
             type="number"
             inputMode="numeric"
             min="0"
-            value={item.stock_tienda ?? ''}
+            value={item.cantidad || ''}
+            onChange={(e) => onChangeQty(item.product_id, e.target.value)}
+            placeholder="0"
+            className="w-full border border-slate-300 rounded-xl px-4 py-3 md:py-3.5 text-left text-base md:text-lg font-bold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 tabular-nums"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Variante 2: producto del historial (3 columnas)
+  const pedidoAnterior = item.originalQty || 0
+  const stockActual = item.stock_tienda ?? ''
+  const pedidoNuevo = item.cantidad || ''
+
+  return (
+    <div className="py-4 md:py-5 border-b border-slate-100">
+      <div className="mb-3">
+        <p className="font-semibold text-sm md:text-base leading-tight">
+          {item.producto_nombre}
+        </p>
+        <p className="text-xs md:text-sm text-slate-500 mt-1">
+          {fmtCRCShort(item.precio_unitario)} c/u
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
+        {/* Pedido anterior */}
+        <div>
+          <label className="text-[10px] md:text-xs text-slate-500 block mb-1.5 text-center">
+            Pedido anterior
+          </label>
+          <div className="w-full border border-slate-200 bg-slate-50 rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-semibold text-slate-600 tabular-nums">
+            {pedidoAnterior}
+          </div>
+        </div>
+
+        {/* Stock actual */}
+        <div>
+          <label className="text-[10px] md:text-xs text-slate-500 block mb-1.5 text-center">
+            Stock actual
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={stockActual}
             onChange={(e) => onChangeStock(item.product_id, e.target.value)}
             placeholder="0"
-            className="w-full border border-slate-300 rounded-xl px-3 py-2.5 md:py-3 text-center text-sm md:text-base font-semibold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            className="w-full border border-slate-300 rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-semibold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 tabular-nums"
           />
         </div>
 
-        <div className="flex-1 max-w-[200px]">
-          <span className="text-[11px] md:text-xs text-slate-500 block mb-1.5 text-center">
-            Pedir
-          </span>
-          <Stepper
-            value={item.cantidad}
-            onChange={(n) => onChangeQty(item.product_id, n)}
-            onRemove={() => onRemove(item.product_id)}
+        {/* Pedido nuevo */}
+        <div>
+          <label className="text-[10px] md:text-xs text-brand-700 font-bold block mb-1.5 text-center">
+            Pedido nuevo
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={pedidoNuevo}
+            onChange={(e) => onChangeQty(item.product_id, e.target.value)}
+            placeholder="0"
+            className={`w-full border rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-bold outline-none tabular-nums transition ${
+              item.cantidad > 0
+                ? 'border-brand-500 bg-brand-50 text-brand-800 focus:ring-2 focus:ring-brand-100'
+                : 'border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100'
+            }`}
           />
         </div>
       </div>

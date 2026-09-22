@@ -101,7 +101,7 @@ export default function OrderEditorPage() {
       company_nombre: company?.nombre ?? 'Distribuidora',
       company_identificacion: company?.identificacion ?? '',
       company_direccion: company?.direccion ?? '',
-      items: editor.items.map((i) => ({
+      items: editor.itemsToOrder.map((i) => ({
         product_id: i.product_id,
         producto_nombre: i.producto_nombre,
         producto_sku: i.producto_sku,
@@ -144,7 +144,7 @@ export default function OrderEditorPage() {
   }
 
   async function handleConfirmOnline() {
-    const itemsPayload = editor.items.map((i) => ({
+    const itemsPayload = editor.itemsToOrder.map((i) => ({
       product_id: i.product_id,
       cantidad: i.cantidad,
       descuento_pct: i.descuento_pct || 0,
@@ -315,7 +315,11 @@ export default function OrderEditorPage() {
   }
 
   async function handleConfirm() {
-    if (editor.items.length === 0 || confirming) return
+    if (editor.itemsToOrder.length === 0) {
+      setConfirmError('Debes indicar al menos un producto en "Pedido nuevo"')
+      return
+    }
+    if (confirming) return
     setConfirmError('')
     setConfirming(true)
 
@@ -368,7 +372,7 @@ export default function OrderEditorPage() {
       <Header title={customer.nombre} subtitle="Nuevo pedido" showBack />
 
       {lastOrder ? (
-        <div className="px-5 md:px-8 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+        <div className="px-5 md:px-8 py-3 bg-brand-50 border-b border-brand-100 flex items-center gap-2.5">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round">
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3 2" />
@@ -378,7 +382,7 @@ export default function OrderEditorPage() {
           </p>
         </div>
       ) : (
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2.5">
+        <div className="px-5 md:px-8 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2.5">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round">
             <circle cx="12" cy="12" r="9" />
             <path d="M12 8v4M12 16h.01" />
@@ -390,7 +394,7 @@ export default function OrderEditorPage() {
       )}
 
       {!online && (
-        <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+        <div className="px-5 md:px-8 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.2" strokeLinecap="round">
             <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
           </svg>
@@ -403,18 +407,15 @@ export default function OrderEditorPage() {
       <div className="flex-1 overflow-y-auto pb-4">
         {historicalItems.length > 0 && (
           <div className="px-4 md:px-8 pt-4 md:pt-6 pb-2">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-3 px-1">
-                Del último pedido
-              </p>
-            </div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-3 px-1">
+              Del último pedido
+            </p>
             {historicalItems.map((item) => (
               <OrderItemRow
                 key={item.product_id}
                 item={item}
                 onChangeQty={editor.changeQty}
                 onChangeStock={editor.changeStock}
-                onRemove={editor.removeItem}
               />
             ))}
           </div>
@@ -423,15 +424,14 @@ export default function OrderEditorPage() {
         {newItems.length > 0 && (
           <div className="px-4 md:px-8 pt-4 md:pt-6 pb-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-3 px-1">
-  Añadidos
-</p>
+              Añadidos
+            </p>
             {newItems.map((item) => (
               <OrderItemRow
                 key={item.product_id}
                 item={item}
                 onChangeQty={editor.changeQty}
                 onChangeStock={editor.changeStock}
-                onRemove={editor.removeItem}
               />
             ))}
           </div>
@@ -463,7 +463,7 @@ export default function OrderEditorPage() {
         </div>
 
         {confirmError && (
-          <div className="mx-4 mt-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-3">
+          <div className="mx-4 md:mx-8 mt-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-3">
             {confirmError}
           </div>
         )}

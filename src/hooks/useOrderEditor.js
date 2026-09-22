@@ -25,13 +25,11 @@ function normalizeItem(i) {
     producto_sku: i.producto_sku,
     precio_unitario: Number(i.precio_unitario) || 0,
     impuesto_pct: Number(i.impuesto_pct) || 0,
-    cantidad: Number(i.cantidad) || 1,
-    descuento_pct: Number(i.descuento_pct) || 0,
-    stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda),
-    originalQty: Number(i.cantidad) || 1,
-    originalStock: i.stock_tienda == null ? null : Number(i.stock_tienda),
-    isNew: false,
-    isModified: false
+    cantidad: 0,
+    descuento_pct: 0,
+    stock_tienda: null,
+    originalQty: Number(i.cantidad) || 0,
+    isNew: false
   }
 }
 
@@ -50,9 +48,10 @@ export function useOrderEditor(initialItems) {
     setItems((prev) => {
       const exists = prev.find((i) => i.product_id === product.id)
       if (exists) {
+        // Ya está en la lista: sumarle 1 al pedido nuevo
         return prev.map((i) =>
           i.product_id === product.id
-            ? { ...i, cantidad: i.cantidad + 1, isModified: i.isNew ? i.isModified : true }
+            ? { ...i, cantidad: (i.cantidad || 0) + 1 }
             : i
         )
       }
@@ -68,25 +67,20 @@ export function useOrderEditor(initialItems) {
           descuento_pct: 0,
           stock_tienda: null,
           originalQty: 0,
-          originalStock: null,
-          isNew: true,
-          isModified: false
+          isNew: true
         }
       ]
     })
   }, [])
 
-  const changeQty = useCallback((productId, qty) => {
+  const changeQty = useCallback((productId, raw) => {
     setItems((prev) =>
-      prev.map((i) =>
-        i.product_id === productId
-          ? {
-              ...i,
-              cantidad: qty,
-              isModified: i.isNew ? false : qty !== i.originalQty
-            }
-          : i
-      )
+      prev.map((i) => {
+        if (i.product_id !== productId) return i
+        const cleaned = String(raw ?? '').replace(/[^0-9]/g, '')
+        const val = cleaned === '' ? 0 : parseInt(cleaned, 10)
+        return { ...i, cantidad: isNaN(val) ? 0 : val }
+      })
     )
   }, [])
 
@@ -94,9 +88,9 @@ export function useOrderEditor(initialItems) {
     setItems((prev) =>
       prev.map((i) => {
         if (i.product_id !== productId) return i
-        const cleaned = String(raw ?? '').replace(/[^0-9.]/g, '')
-        const val = cleaned === '' ? null : Number(cleaned)
-        return { ...i, stock_tienda: val }
+        const cleaned = String(raw ?? '').replace(/[^0-9]/g, '')
+        const val = cleaned === '' ? null : parseInt(cleaned, 10)
+        return { ...i, stock_tienda: isNaN(val) ? null : val }
       })
     )
   }, [])
@@ -121,6 +115,7 @@ export function useOrderEditor(initialItems) {
     let itemCount = 0
 
     for (const item of items) {
+      if (!item.cantidad || item.cantidad <= 0) continue
       const { subtotal: s, impuesto: iv } = calcLine(item)
       subtotal += s
       impuestos += iv
@@ -135,8 +130,15 @@ export function useOrderEditor(initialItems) {
     }
   }, [items])
 
+  // Solo items con cantidad > 0 se envían al backend
+  const itemsToOrder = useMemo(
+    () => items.filter((i) => i.cantidad > 0),
+    [items]
+  )
+
   return {
     items,
+    itemsToOrder,
     totals,
     addItem,
     changeQty,
