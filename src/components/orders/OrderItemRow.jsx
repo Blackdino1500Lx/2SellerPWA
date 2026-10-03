@@ -7,8 +7,14 @@ export default function OrderItemRow({
 }) {
   // Variante 1: producto nuevo
   if (item.isNew) {
+    const sinPedido = !item.cantidad || item.cantidad === 0
+
     return (
-      <div className="py-4 md:py-5 border-b border-slate-100">
+      <div
+        className={`py-4 md:py-5 border-b border-slate-100 transition-colors ${
+          sinPedido ? 'border-l-2 border-l-red-300 pl-3' : ''
+        }`}
+      >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -18,6 +24,11 @@ export default function OrderItemRow({
               <span className="text-[9px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">
                 NUEVO
               </span>
+              {sinPedido && (
+                <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+                  SIN PEDIDO
+                </span>
+              )}
             </div>
             <p className="text-xs md:text-sm text-slate-500 mt-1">
               {fmtCRCShort(item.precio_unitario)} c/u
@@ -50,22 +61,34 @@ export default function OrderItemRow({
 
   const stockNum = item.stock_tienda == null ? null : Number(item.stock_tienda)
   const cantNum = Number(item.cantidad) || 0
+  const sinPedido = cantNum === 0
+
   const mostrarResultante = stockNum != null && cantNum > 0
   const stockResultante = mostrarResultante ? stockNum + cantNum : null
 
   return (
-    <div className="py-4 md:py-5 border-b border-slate-100">
+    <div
+      className={`py-4 md:py-5 border-b border-slate-100 transition-colors ${
+        sinPedido ? 'border-l-2 border-l-red-300 pl-3' : ''
+      }`}
+    >
       <div className="mb-3">
-        <p className="font-semibold text-sm md:text-base leading-tight">
-          {item.producto_nombre}
-        </p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="font-semibold text-sm md:text-base leading-tight">
+            {item.producto_nombre}
+          </p>
+          {sinPedido && (
+            <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+              SIN PEDIDO
+            </span>
+          )}
+        </div>
         <p className="text-xs md:text-sm text-slate-500 mt-1">
           {fmtCRCShort(item.precio_unitario)} c/u
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-2 md:gap-4">
-        {/* Stock anterior (con cuánto quedó la última visita) */}
         <div>
           <label className="text-[10px] md:text-xs text-slate-500 block mb-1.5 text-center">
             Stock anterior
@@ -75,7 +98,6 @@ export default function OrderItemRow({
           </div>
         </div>
 
-        {/* Stock actual */}
         <div>
           <label
             className={`text-[10px] md:text-xs block mb-1.5 text-center ${
@@ -100,7 +122,6 @@ export default function OrderItemRow({
           />
         </div>
 
-        {/* Pedido nuevo */}
         <div>
           <label className="text-[10px] md:text-xs text-brand-700 font-bold block mb-1.5 text-center">
             Pedido nuevo
@@ -115,7 +136,7 @@ export default function OrderItemRow({
             className={`w-full border rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-bold outline-none tabular-nums transition ${
               item.cantidad > 0
                 ? 'border-brand-500 bg-brand-50 text-brand-800 focus:ring-2 focus:ring-brand-100'
-                : 'border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100'
+                : 'border-red-300 bg-red-50/50 text-red-700 focus:ring-2 focus:ring-red-100'
             }`}
           />
         </div>

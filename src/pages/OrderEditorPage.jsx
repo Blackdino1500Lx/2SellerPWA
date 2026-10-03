@@ -101,16 +101,17 @@ export default function OrderEditorPage() {
       company_nombre: company?.nombre ?? 'Distribuidora',
       company_identificacion: company?.identificacion ?? '',
       company_direccion: company?.direccion ?? '',
-      items: (savedOrder.order_items || []).map((i) => ({
-  producto_sku: i.producto_sku,
-  producto_nombre: i.producto_nombre,
-  precio_unitario: Number(i.precio_unitario),
-  impuesto_pct: Number(i.impuesto_pct),
-  cantidad: Number(i.cantidad),
-  descuento_pct: Number(i.descuento_pct),
-  stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda),
-  stock_resultante: i.stock_resultante == null ? null : Number(i.stock_resultante)
-}))
+      // Se guardan TODOS los items (históricos + nuevos con qty > 0)
+      items: editor.itemsToSave.map((i) => ({
+        product_id: i.product_id,
+        producto_nombre: i.producto_nombre,
+        producto_sku: i.producto_sku,
+        precio_unitario: i.precio_unitario,
+        impuesto_pct: i.impuesto_pct,
+        cantidad: i.cantidad,
+        descuento_pct: i.descuento_pct || 0,
+        stock_tienda: i.stock_tienda
+      }))
     }
   }
 
@@ -123,7 +124,8 @@ export default function OrderEditorPage() {
         subtotal: order.subtotal,
         impuestos: order.impuestos,
         total: order.total,
-        items: order.items
+        // PDF: solo los items con cantidad > 0
+        items: order.items.filter((i) => Number(i.cantidad) > 0)
       },
       empresa: {
         nombre: order.company_nombre,
@@ -144,7 +146,7 @@ export default function OrderEditorPage() {
   }
 
   async function handleConfirmOnline() {
-    const itemsPayload = editor.itemsToOrder.map((i) => ({
+    const itemsPayload = editor.itemsToSave.map((i) => ({
       product_id: i.product_id,
       cantidad: i.cantidad,
       descuento_pct: i.descuento_pct || 0,
@@ -170,11 +172,11 @@ export default function OrderEditorPage() {
         subtotal, impuestos, total,
         cliente_nombre, cliente_identificacion, cliente_direccion,
         order_items (
-  producto_sku, producto_nombre,
-  precio_unitario, impuesto_pct,
-  cantidad, descuento_pct,
-  stock_tienda, stock_resultante
-)
+          producto_sku, producto_nombre,
+          precio_unitario, impuesto_pct,
+          cantidad, descuento_pct,
+          stock_tienda, stock_resultante
+        )
       `)
       .eq('id', rpcResult.order_id)
       .single()
@@ -188,15 +190,19 @@ export default function OrderEditorPage() {
       subtotal: Number(savedOrder.subtotal),
       impuestos: Number(savedOrder.impuestos),
       total: Number(savedOrder.total),
-      items: (savedOrder.order_items || []).map((i) => ({
-        producto_sku: i.producto_sku,
-        producto_nombre: i.producto_nombre,
-        precio_unitario: Number(i.precio_unitario),
-        impuesto_pct: Number(i.impuesto_pct),
-        cantidad: Number(i.cantidad),
-        descuento_pct: Number(i.descuento_pct),
-        stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda)
-      }))
+      // PDF: solo los que tienen cantidad > 0
+      items: (savedOrder.order_items || [])
+        .filter((i) => Number(i.cantidad) > 0)
+        .map((i) => ({
+          producto_sku: i.producto_sku,
+          producto_nombre: i.producto_nombre,
+          precio_unitario: Number(i.precio_unitario),
+          impuesto_pct: Number(i.impuesto_pct),
+          cantidad: Number(i.cantidad),
+          descuento_pct: Number(i.descuento_pct),
+          stock_tienda: i.stock_tienda == null ? null : Number(i.stock_tienda),
+          stock_resultante: i.stock_resultante == null ? null : Number(i.stock_resultante)
+        }))
     }
 
     const clientePDF = {
@@ -316,8 +322,8 @@ export default function OrderEditorPage() {
   }
 
   async function handleConfirm() {
-    if (editor.itemsToOrder.length === 0) {
-      setConfirmError('Debes indicar al menos un producto en "Pedido nuevo"')
+    if (!editor.canConfirm) {
+      setConfirmError('Debes indicar al menos un producto con cantidad mayor a 0')
       return
     }
     if (confirming) return
@@ -475,7 +481,7 @@ export default function OrderEditorPage() {
       <OrderTotals
         totals={editor.totals}
         onConfirm={handleConfirm}
-        disabled={confirming}
+        disabled={confirming || !editor.canConfirm}
       />
 
       {confirming && (

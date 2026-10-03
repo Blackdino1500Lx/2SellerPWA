@@ -19,16 +19,11 @@ function round2(n) {
 }
 
 function normalizeItem(i) {
-  // El "stock anterior" es con lo que quedó la tienda la última visita:
-  // stock_tienda + cantidad del pedido previo (ya viene calculado como stock_resultante).
-  // Fallback: si no hay stock_resultante, se usa la cantidad pedida (para pedidos viejos).
   const stockAnterior =
     i.stock_resultante != null
       ? Number(i.stock_resultante)
       : Number(i.cantidad) || 0
 
-  // Si la DB ya guardó el stock_resultante del pedido anterior, úsalo como
-  // stock actual sugerido. Si no, empieza vacío.
   const stockSugerido = i.stock_resultante != null ? Number(i.stock_resultante) : null
 
   return {
@@ -41,7 +36,6 @@ function normalizeItem(i) {
     descuento_pct: 0,
     stock_tienda: stockSugerido,
     stockSuggested: stockSugerido != null,
-    // Referencia: con cuánto quedó en tienda la última visita
     stockAnterior,
     isNew: false
   }
@@ -127,6 +121,7 @@ export function useOrderEditor(initialItems) {
     )
   }, [])
 
+  // Totales: solo suman items con cantidad > 0
   const totals = useMemo(() => {
     let subtotal = 0
     let impuestos = 0
@@ -148,14 +143,32 @@ export function useOrderEditor(initialItems) {
     }
   }, [items])
 
-  const itemsToOrder = useMemo(
+  // Items que se guardan en la DB:
+  // - Históricos: SIEMPRE (aunque cantidad = 0).
+  // - Nuevos: solo si cantidad > 0.
+  const itemsToSave = useMemo(
+    () =>
+      items.filter((i) => {
+        if (!i.isNew) return true
+        return i.cantidad > 0
+      }),
+    [items]
+  )
+
+  // Items que van al PDF: solo los que tienen cantidad > 0
+  const itemsWithQty = useMemo(
     () => items.filter((i) => i.cantidad > 0),
     [items]
   )
 
+  // ¿Se puede confirmar? Solo si hay al menos un item con cantidad > 0
+  const canConfirm = itemsWithQty.length > 0
+
   return {
     items,
-    itemsToOrder,
+    itemsToSave,
+    itemsWithQty,
+    canConfirm,
     totals,
     addItem,
     changeQty,
