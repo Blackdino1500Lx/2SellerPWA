@@ -19,12 +19,15 @@ function round2(n) {
 }
 
 function normalizeItem(i) {
+  // Stock anterior: viene del pedido previo.
+  // - Si el pedido previo reportó stock → stock_resultante (stock + pedido anterior)
+  // - Si no reportó stock → null (no usamos la cantidad como fallback, era confuso)
   const stockAnterior =
-    i.stock_resultante != null
-      ? Number(i.stock_resultante)
-      : Number(i.cantidad) || 0
+    i.stock_resultante != null ? Number(i.stock_resultante) : null
 
-  const stockSugerido = i.stock_resultante != null ? Number(i.stock_resultante) : null
+  // Sugerencia para el "stock actual": solo si hubo stock_resultante
+  const stockSugerido =
+    i.stock_resultante != null ? Number(i.stock_resultante) : null
 
   return {
     product_id: i.product_id,
@@ -74,7 +77,7 @@ export function useOrderEditor(initialItems) {
           descuento_pct: 0,
           stock_tienda: null,
           stockSuggested: false,
-          stockAnterior: 0,
+          stockAnterior: null,
           isNew: true
         }
       ]
@@ -121,7 +124,6 @@ export function useOrderEditor(initialItems) {
     )
   }, [])
 
-  // Totales: solo suman items con cantidad > 0
   const totals = useMemo(() => {
     let subtotal = 0
     let impuestos = 0
@@ -143,25 +145,28 @@ export function useOrderEditor(initialItems) {
     }
   }, [items])
 
-  // Items que se guardan en la DB:
-  // - Históricos: SIEMPRE (aunque cantidad = 0).
-  // - Nuevos: solo si cantidad > 0.
+  // REGLA DE PERSISTENCIA:
+  // Se guarda un item en la DB si:
+  //   - stock_tienda > 0  (el cliente tiene stock, aunque no pida)
+  //   - O cantidad > 0    (se está pidiendo el producto)
+  // Se descarta si:
+  //   - stock_tienda es null o 0 Y cantidad = 0
   const itemsToSave = useMemo(
     () =>
       items.filter((i) => {
-        if (!i.isNew) return true
-        return i.cantidad > 0
+        const hasStock = i.stock_tienda != null && Number(i.stock_tienda) > 0
+        const hasOrder = Number(i.cantidad) > 0
+        return hasStock || hasOrder
       }),
     [items]
   )
 
-  // Items que van al PDF: solo los que tienen cantidad > 0
+  // Items para el PDF: solo los que tienen cantidad > 0
   const itemsWithQty = useMemo(
     () => items.filter((i) => i.cantidad > 0),
     [items]
   )
 
-  // ¿Se puede confirmar? Solo si hay al menos un item con cantidad > 0
   const canConfirm = itemsWithQty.length > 0
 
   return {

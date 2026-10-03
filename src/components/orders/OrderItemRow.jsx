@@ -10,11 +10,7 @@ export default function OrderItemRow({
     const sinPedido = !item.cantidad || item.cantidad === 0
 
     return (
-      <div
-        className={`py-4 md:py-5 border-b border-slate-100 transition-colors ${
-          sinPedido ? 'border-l-2 border-l-red-300 pl-3' : ''
-        }`}
-      >
+      <div className={`py-4 md:py-5 border-b border-slate-100 ${sinPedido ? 'opacity-60' : ''}`}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -24,11 +20,6 @@ export default function OrderItemRow({
               <span className="text-[9px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">
                 NUEVO
               </span>
-              {sinPedido && (
-                <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                  SIN PEDIDO
-                </span>
-              )}
             </div>
             <p className="text-xs md:text-sm text-slate-500 mt-1">
               {fmtCRCShort(item.precio_unitario)} c/u
@@ -55,21 +46,29 @@ export default function OrderItemRow({
   }
 
   // Variante 2: producto del historial
-  const stockAnterior = item.stockAnterior ?? 0
-  const stockActual = item.stock_tienda ?? ''
-  const pedidoNuevo = item.cantidad || ''
-
-  const stockNum = item.stock_tienda == null ? null : Number(item.stock_tienda)
+  const stockActualNum = item.stock_tienda == null ? null : Number(item.stock_tienda)
   const cantNum = Number(item.cantidad) || 0
-  const sinPedido = cantNum === 0
 
-  const mostrarResultante = stockNum != null && cantNum > 0
-  const stockResultante = mostrarResultante ? stockNum + cantNum : null
+  const tieneStock = stockActualNum != null && stockActualNum > 0
+  const tienePedido = cantNum > 0
+
+  // Estado visual:
+  // - tiene pedido → normal
+  // - no pedido pero tiene stock → se conserva en historial (ámbar suave)
+  // - no pedido y sin stock → se quitará del historial (rojo intenso)
+  const seQuitara = !tienePedido && !tieneStock
+
+  const mostrarResultante = stockActualNum != null && cantNum > 0
+  const stockResultante = mostrarResultante ? stockActualNum + cantNum : null
 
   return (
     <div
-      className={`py-4 md:py-5 border-b border-slate-100 transition-colors ${
-        sinPedido ? 'border-l-2 border-l-red-300 pl-3' : ''
+      className={`py-4 md:py-5 border-b transition-colors ${
+        seQuitara
+          ? 'border-b-red-100 border-l-2 border-l-red-400 pl-3 bg-red-50/40'
+          : tienePedido
+          ? 'border-slate-100'
+          : 'border-b-amber-100 border-l-2 border-l-amber-300 pl-3'
       }`}
     >
       <div className="mb-3">
@@ -77,8 +76,13 @@ export default function OrderItemRow({
           <p className="font-semibold text-sm md:text-base leading-tight">
             {item.producto_nombre}
           </p>
-          {sinPedido && (
+          {seQuitara && (
             <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+              SE QUITARÁ
+            </span>
+          )}
+          {!seQuitara && !tienePedido && (
+            <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
               SIN PEDIDO
             </span>
           )}
@@ -89,15 +93,17 @@ export default function OrderItemRow({
       </div>
 
       <div className="grid grid-cols-3 gap-2 md:gap-4">
+        {/* Stock anterior */}
         <div>
           <label className="text-[10px] md:text-xs text-slate-500 block mb-1.5 text-center">
             Stock anterior
           </label>
           <div className="w-full border border-slate-200 bg-slate-50 rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-semibold text-slate-600 tabular-nums">
-            {stockAnterior}
+            {item.stockAnterior == null ? '—' : item.stockAnterior}
           </div>
         </div>
 
+        {/* Stock actual */}
         <div>
           <label
             className={`text-[10px] md:text-xs block mb-1.5 text-center ${
@@ -111,7 +117,7 @@ export default function OrderItemRow({
             type="number"
             inputMode="numeric"
             min="0"
-            value={stockActual}
+            value={item.stock_tienda ?? ''}
             onChange={(e) => onChangeStock(item.product_id, e.target.value)}
             placeholder="0"
             className={`w-full border rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-semibold outline-none tabular-nums ${
@@ -122,6 +128,7 @@ export default function OrderItemRow({
           />
         </div>
 
+        {/* Pedido nuevo */}
         <div>
           <label className="text-[10px] md:text-xs text-brand-700 font-bold block mb-1.5 text-center">
             Pedido nuevo
@@ -130,13 +137,15 @@ export default function OrderItemRow({
             type="number"
             inputMode="numeric"
             min="0"
-            value={pedidoNuevo}
+            value={item.cantidad || ''}
             onChange={(e) => onChangeQty(item.product_id, e.target.value)}
             placeholder="0"
             className={`w-full border rounded-xl px-2 py-2.5 md:py-3 text-center text-sm md:text-base font-bold outline-none tabular-nums transition ${
-              item.cantidad > 0
+              tienePedido
                 ? 'border-brand-500 bg-brand-50 text-brand-800 focus:ring-2 focus:ring-brand-100'
-                : 'border-red-300 bg-red-50/50 text-red-700 focus:ring-2 focus:ring-red-100'
+                : seQuitara
+                ? 'border-red-300 bg-red-50 text-red-700'
+                : 'border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100'
             }`}
           />
         </div>
@@ -148,6 +157,15 @@ export default function OrderItemRow({
             <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>
           <span>Sugerido del pedido anterior. Verifícalo.</span>
+        </div>
+      )}
+
+      {seQuitara && (
+        <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-red-700">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M12 8v4M12 16h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <span>Sin stock y sin pedido. Se quitará del historial.</span>
         </div>
       )}
 
